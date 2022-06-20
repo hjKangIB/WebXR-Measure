@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
 import { BufferGeometryUtils } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 let container, labelContainer;
 let camera, scene, renderer, light;
@@ -18,6 +19,8 @@ let currentLine = null;
 let distances = [];
 
 let width, height;
+
+let woodTable3DModel;
 
 function toScreenPosition(point, camera) {
   var vector = new THREE.Vector3();
@@ -110,6 +113,23 @@ function getDistance(points) {
   if (points.length == 3) return points[1].distanceTo(points[2]);
 }
 
+function init3DLoader() {
+  const loader = new GLTFLoader();
+
+  loader.load(
+    "src/models/wood-table-3d-model/wood_table_001_4k.gltf",
+    // "./models/wood-table-3d-model/wood_table_001_4k.gltf",
+    function (gltf) {
+      woodTable3DModel = gltf.scene;
+      // scene.add(gltf.scene);
+    },
+    undefined,
+    function (error) {
+      console.error(error);
+    }
+  );
+}
+
 function initXR() {
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -142,6 +162,8 @@ function initXR() {
   controller.addEventListener("select", onSelect);
   scene.add(controller);
 
+  init3DLoader();
+
   initReticle();
   scene.add(reticle);
 
@@ -151,6 +173,7 @@ function initXR() {
 
 function onSelect() {
   if (reticle.visible) {
+    scene.add(woodTable3DModel);
     measurements.push(matrixToVector(reticle.matrix));
     if (measurements.length == 2) {
       let distance = Math.round(getDistance(measurements) * 100);
