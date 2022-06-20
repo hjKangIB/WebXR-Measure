@@ -1,6 +1,6 @@
-import * as THREE from 'three';
-import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
-import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import * as THREE from "three";
+import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
+import { BufferGeometryUtils } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 let container, labelContainer;
 let camera, scene, renderer, light;
@@ -15,25 +15,25 @@ let labels = [];
 let reticle;
 let currentLine = null;
 
+let distances = [];
+
 let width, height;
 
-function toScreenPosition(point, camera)
-{
+function toScreenPosition(point, camera) {
   var vector = new THREE.Vector3();
-  
+
   vector.copy(point);
   vector.project(camera);
-  
-  vector.x = (vector.x + 1) * width /2;
-  vector.y = (-vector.y + 1) * height/2;
+
+  vector.x = ((vector.x + 1) * width) / 2;
+  vector.y = ((-vector.y + 1) * height) / 2;
   vector.z = 0;
 
-  return vector
-
-};
+  return vector;
+}
 
 function getCenterPoint(points) {
-  let line = new THREE.Line3(...points)
+  let line = new THREE.Line3(...points);
   return line.getCenter();
 }
 
@@ -47,7 +47,7 @@ function initLine(point) {
   let lineMaterial = new THREE.LineBasicMaterial({
     color: 0xffffff,
     linewidth: 5,
-    linecap: 'round'
+    linecap: "round",
   });
 
   let lineGeometry = new THREE.BufferGeometry().setFromPoints([point, point]);
@@ -56,16 +56,18 @@ function initLine(point) {
 
 function updateLine(matrix) {
   let positions = currentLine.geometry.attributes.position.array;
-  positions[3] = matrix.elements[12]
-  positions[4] = matrix.elements[13]
-  positions[5] = matrix.elements[14]
+  positions[3] = matrix.elements[12];
+  positions[4] = matrix.elements[13];
+  positions[5] = matrix.elements[14];
   currentLine.geometry.attributes.position.needsUpdate = true;
   currentLine.geometry.computeBoundingSphere();
 }
 
 function initReticle() {
-  let ring = new THREE.RingBufferGeometry(0.045, 0.05, 32).rotateX(- Math.PI / 2);
-  let dot = new THREE.CircleBufferGeometry(0.005, 32).rotateX(- Math.PI / 2);
+  let ring = new THREE.RingBufferGeometry(0.045, 0.05, 32).rotateX(
+    -Math.PI / 2
+  );
+  let dot = new THREE.CircleBufferGeometry(0.005, 32).rotateX(-Math.PI / 2);
   reticle = new THREE.Mesh(
     BufferGeometryUtils.mergeBufferGeometries([ring, dot]),
     new THREE.MeshBasicMaterial()
@@ -82,11 +84,11 @@ function initRenderer() {
 }
 
 function initLabelContainer() {
-  labelContainer = document.createElement('div');
-  labelContainer.style.position = 'absolute';
-  labelContainer.style.top = '0px';
-  labelContainer.style.pointerEvents = 'none';
-  labelContainer.setAttribute('id', 'container');
+  labelContainer = document.createElement("div");
+  labelContainer.style.position = "absolute";
+  labelContainer.style.top = "0px";
+  labelContainer.style.pointerEvents = "none";
+  labelContainer.setAttribute("id", "container");
 }
 
 function initCamera() {
@@ -103,12 +105,13 @@ function initScene() {
 }
 
 function getDistance(points) {
-  if (points.length == 2)
-    return points[0].distanceTo(points[1]);
+  if (points.length <= 1) return 0;
+  if (points.length == 2) return points[0].distanceTo(points[1]);
+  if (points.length == 3) return points[1].distanceTo(points[2]);
 }
 
 function initXR() {
-  container = document.createElement('div');
+  container = document.createElement("div");
   document.body.appendChild(container);
 
   width = window.innerWidth;
@@ -121,27 +124,29 @@ function initXR() {
   initLight();
   scene.add(light);
 
-  initRenderer()
+  initRenderer();
   container.appendChild(renderer.domElement);
 
-  initLabelContainer()
+  initLabelContainer();
   container.appendChild(labelContainer);
 
-  document.body.appendChild(ARButton.createButton(renderer, {
-    optionalFeatures: ["dom-overlay"],
-    domOverlay: {root: document.querySelector('#container')}, 
-    requiredFeatures: ['hit-test']
-  }));
+  document.body.appendChild(
+    ARButton.createButton(renderer, {
+      optionalFeatures: ["dom-overlay"],
+      domOverlay: { root: document.querySelector("#container") },
+      requiredFeatures: ["hit-test"],
+    })
+  );
 
   controller = renderer.xr.getController(0);
-  controller.addEventListener('select', onSelect);
+  controller.addEventListener("select", onSelect);
   scene.add(controller);
 
   initReticle();
   scene.add(reticle);
 
-  window.addEventListener('resize', onWindowResize, false);
-  animate()
+  window.addEventListener("resize", onWindowResize, false);
+  animate();
 }
 
 function onSelect() {
@@ -149,14 +154,40 @@ function onSelect() {
     measurements.push(matrixToVector(reticle.matrix));
     if (measurements.length == 2) {
       let distance = Math.round(getDistance(measurements) * 100);
+      distances.push(distance);
 
-      let text = document.createElement('div');
-      text.className = 'label';
-      text.style.color = 'rgb(255,255,255)';
-      text.textContent = distance + ' cm';
-      document.querySelector('#container').appendChild(text);
+      let text = document.createElement("div");
+      text.className = "label";
+      text.style.color = "rgb(255,255,255)";
+      text.textContent = distance + " cm";
 
-      labels.push({div: text, point: getCenterPoint(measurements)});
+      document.querySelector("#container").appendChild(text);
+
+      labels.push({
+        div: text,
+        point: getCenterPoint([measurements[0], measurements[1]]),
+      });
+
+      currentLine = initLine(measurements[1]);
+      scene.add(currentLine);
+      // measurements = [];
+      // currentLine = null;
+    } else if (measurements.length == 3) {
+      let distance = Math.round(getDistance(measurements) * 100);
+      distances.push(distance);
+
+      let text = document.createElement("div");
+      text.className = "label";
+      // text.style.color = "rgb(37,219,0)";
+      text.style.color = "rgb(255,255,255)";
+      text.textContent = distance + " cm";
+
+      document.querySelector("#container").appendChild(text);
+
+      labels.push({
+        div: text,
+        point: getCenterPoint([measurements[1], measurements[2]]),
+      });
 
       measurements = [];
       currentLine = null;
@@ -170,7 +201,7 @@ function onSelect() {
 function onWindowResize() {
   width = window.innerWidth;
   height = window.innerHeight;
-  camera.aspect = width/height;
+  camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
 }
@@ -184,12 +215,14 @@ function render(timestamp, frame) {
     let referenceSpace = renderer.xr.getReferenceSpace();
     let session = renderer.xr.getSession();
     if (hitTestSourceRequested === false) {
-      session.requestReferenceSpace('viewer').then(function (referenceSpace) {
-        session.requestHitTestSource({ space: referenceSpace }).then(function (source) {
-          hitTestSource = source;
-        });
+      session.requestReferenceSpace("viewer").then(function (referenceSpace) {
+        session
+          .requestHitTestSource({ space: referenceSpace })
+          .then(function (source) {
+            hitTestSource = source;
+          });
       });
-      session.addEventListener('end', function () {
+      session.addEventListener("end", function () {
         hitTestSourceRequested = false;
         hitTestSource = null;
       });
@@ -215,11 +248,11 @@ function render(timestamp, frame) {
       let pos = toScreenPosition(label.point, renderer.xr.getCamera(camera));
       let x = pos.x;
       let y = pos.y;
-      label.div.style.transform = "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
-    })
-
+      label.div.style.transform =
+        "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
+    });
   }
   renderer.render(scene, camera);
 }
 
-export { initXR }
+export { initXR };
