@@ -2,6 +2,9 @@ import * as THREE from "three";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
 import { BufferGeometryUtils } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { Vector3 } from "three";
+
+let axis;
 
 let container, labelContainer;
 let camera, scene, renderer, light;
@@ -15,6 +18,10 @@ let labels = [];
 
 let reticle;
 let currentLine = null;
+
+let axisXLine = null;
+let axisYLine = null;
+let axisZLine = null;
 
 let distances = [];
 
@@ -57,6 +64,21 @@ function initLine(point) {
   return new THREE.Line(lineGeometry, lineMaterial);
 }
 
+function initAxisLine(point, type) {
+  const color = type === "x" ? "red" : type === "y" ? "green" : "blue";
+  let lineMaterial = new THREE.LineBasicMaterial({
+    color,
+    linewidth: 5,
+    linecap: "round",
+  });
+
+  let lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new Vector3(0, 0, 0),
+    point,
+  ]);
+  return new THREE.Line(lineGeometry, lineMaterial);
+}
+
 function updateLine(matrix) {
   let positions = currentLine.geometry.attributes.position.array;
   positions[3] = matrix.elements[12];
@@ -64,6 +86,53 @@ function updateLine(matrix) {
   positions[5] = matrix.elements[14];
   currentLine.geometry.attributes.position.needsUpdate = true;
   currentLine.geometry.computeBoundingSphere();
+}
+
+function drawAxis() {
+  const zeroVector = new Vector3(0, 0, 0);
+  const xUnitVector = new Vector3(5, 0, 0);
+  const yUnitVector = new Vector3(0, 5, 0);
+  const zUnitVector = new Vector3(0, 0, 5);
+  let xText = document.createElement("div");
+  let yText = document.createElement("div");
+  let zText = document.createElement("div");
+  xText.className = "label";
+  xText.style.color = "red";
+  xText.textContent = "X axis";
+  document.querySelector("#container").appendChild(xText);
+
+  labels.push({
+    div: xText,
+    point: getCenterPoint([zeroVector, xUnitVector]),
+  });
+
+  yText.className = "label";
+  yText.style.color = "green";
+  yText.textContent = "Y axis";
+  document.querySelector("#container").appendChild(yText);
+
+  labels.push({
+    div: yText,
+    point: getCenterPoint([zeroVector, yUnitVector]),
+  });
+
+  zText.className = "label";
+  zText.style.color = "blue";
+  zText.textContent = "Z axis";
+
+  document.querySelector("#container").appendChild(zText);
+
+  labels.push({
+    div: zText,
+    point: getCenterPoint([zeroVector, zUnitVector]),
+  });
+
+  axisXLine = initAxisLine(xUnitVector, "x");
+  axisYLine = initAxisLine(yUnitVector, "y");
+  axisZLine = initAxisLine(zUnitVector, "z");
+  scene.add(axisXLine);
+  scene.add(axisYLine);
+  scene.add(axisZLine);
 }
 
 function initReticle() {
@@ -125,7 +194,7 @@ function init3DLoader() {
       model3D.position.set(0.0001, 0, 0);
       model3D.scale.set(0.01, 0.01, 0.01);
       // scene.add(gltf.scene);
-      scene.add(model3D);
+      // scene.add(model3D);
     },
     undefined,
     function (error) {
@@ -173,12 +242,12 @@ function initXR() {
 
   window.addEventListener("resize", onWindowResize, false);
   animate();
-  // scene.add(model3D);
+
+  drawAxis();
 }
 
 function onSelect() {
   if (reticle.visible) {
-    // scene.add(model3D);
     measurements.push(matrixToVector(reticle.matrix));
     if (measurements.length == 2) {
       let distance = Math.round(getDistance(measurements) * 100);
@@ -201,6 +270,7 @@ function onSelect() {
       // measurements = [];
       // currentLine = null;
     } else if (measurements.length == 3) {
+      scene.add(model3D);
       let distance = Math.round(getDistance(measurements) * 100);
       distances.push(distance);
 
@@ -269,6 +339,9 @@ function render(timestamp, frame) {
 
       if (currentLine) {
         updateLine(reticle.matrix);
+      }
+      if (axisXLine) {
+        // updateAxisXLine(reticle.matrix);
       }
     }
 
