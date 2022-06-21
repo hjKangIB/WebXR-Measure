@@ -20,7 +20,7 @@ let distances = [];
 
 let width, height;
 
-let woodTable3DModel;
+let model3D;
 
 function toScreenPosition(point, camera) {
   var vector = new THREE.Vector3();
@@ -99,7 +99,7 @@ function initCamera() {
 }
 
 function initLight() {
-  light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+  light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 5);
   light.position.set(0.5, 1, 0.25);
 }
 
@@ -117,11 +117,15 @@ function init3DLoader() {
   const loader = new GLTFLoader();
 
   loader.load(
-    "src/models/wood-table-3d-model/wood_table_001_4k.gltf",
-    // "./models/wood-table-3d-model/wood_table_001_4k.gltf",
+    // "src/models/wood-table-3d-model/wood_table_001_4k.gltf",
+    // "src/models/nonTextureTile/nonTextureTile.gltf",
+    "src/models/woodTile/woodTile.gltf",
     function (gltf) {
-      woodTable3DModel = gltf.scene;
+      model3D = gltf.scene;
+      model3D.position.set(0.0001, 0, 0);
+      model3D.scale.set(0.01, 0.01, 0.01);
       // scene.add(gltf.scene);
+      scene.add(model3D);
     },
     undefined,
     function (error) {
@@ -169,11 +173,12 @@ function initXR() {
 
   window.addEventListener("resize", onWindowResize, false);
   animate();
+  // scene.add(model3D);
 }
 
 function onSelect() {
   if (reticle.visible) {
-    scene.add(woodTable3DModel);
+    // scene.add(model3D);
     measurements.push(matrixToVector(reticle.matrix));
     if (measurements.length == 2) {
       let distance = Math.round(getDistance(measurements) * 100);
