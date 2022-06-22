@@ -5,6 +5,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { Vector3 } from "three";
 
 let axis;
+let isAxis = false;
 
 let container, labelContainer;
 let camera, scene, renderer, light;
@@ -15,6 +16,7 @@ let hitTestSourceRequested = false;
 
 let measurements = [];
 let labels = [];
+let axisLegendLabel = [];
 
 let reticle;
 let currentLine = null;
@@ -81,51 +83,123 @@ function initAxisLine(point, type) {
 
 function updateLine(matrix) {
   let positions = currentLine.geometry.attributes.position.array;
-  positions[3] = matrix.elements[12];
-  positions[4] = matrix.elements[13];
-  positions[5] = matrix.elements[14];
+  positions[3] = matrix.elements[12]; // x?
+  positions[4] = matrix.elements[13]; // y?
+  positions[5] = matrix.elements[14]; // z ?
   currentLine.geometry.attributes.position.needsUpdate = true;
   currentLine.geometry.computeBoundingSphere();
 }
 
+/**
+ * matrix.elements 의 [12] [13] [14] 가 hitTest 결과 바닥으로 인식된 지점의 3차원 (x,y,z) 좌표로 보인다.
+ * 이로인해 테스트중 보조도구로 생성했던 x축, y축, z축 선분을 인식된 바닥을 기준으로 y축 이동을 해주는 함수이다.
+ * reticle 표시지점을 새 원점 (0,0,0) 으로 삼고
+ *  x축 선분은 (0,0,0), (1,0,0)
+ *  y축 선분은 (0,0,0), (0,1,0)
+ *  z축 선분은 (0,0,0), (0,0,1)
+ * 로 표시해준다.
+ * */
+function updateAxisLine(matrix) {
+  let xAxisPositions = axisXLine.geometry.attributes.position.array;
+  // let yAxisPositions = axisYLine.geometry.attributes.position.array;
+  let zAxisPositions = axisZLine.geometry.attributes.position.array;
+
+  const newOriginX = matrix.elements[12];
+  const newOriginY = matrix.elements[13];
+  const newOriginZ = matrix.elements[14];
+
+  const newUnitVectorX = newOriginX + 1;
+  const newUnitVectorY = newOriginY; //y축은 표시될 필요가 없기때문에 그대로 둔다.
+  const newUnitVectorZ = newOriginZ + 1;
+
+  //선분의 두 점중 첫번째 점의 x좌표
+  xAxisPositions[0] = newOriginX;
+  // yAxisPositions[0] = newOriginX;
+  zAxisPositions[0] = newOriginX;
+
+  //선분의 두 점중 첫번째 점의 y좌표
+  xAxisPositions[1] = newOriginY;
+  // yAxisPositions[1] = newOriginY;
+  zAxisPositions[1] = newOriginY;
+
+  //선분의 두 점중 첫번째 점의 z좌표
+  xAxisPositions[2] = newOriginZ;
+  // yAxisPositions[2] = newOriginZ;
+  zAxisPositions[2] = newOriginZ;
+
+  //선분의 두 점중 두번째 점의 x좌표
+  xAxisPositions[3] = newUnitVectorX;
+  // yAxisPositions[3] = newOriginX;
+  zAxisPositions[3] = newOriginX;
+
+  //선분의 두 점중 두번째 점의 y좌표
+  xAxisPositions[4] = newOriginY;
+  // yAxisPositions[4] = newOriginY;
+  zAxisPositions[4] = newOriginY;
+
+  //선분의 두 점중 두번째 점의 z좌표
+  xAxisPositions[5] = newOriginZ;
+  // yAxisPositions[5] = newOriginZ;
+  zAxisPositions[5] = newUnitVectorZ;
+
+  axisXLine.geometry.attributes.position.needsUpdate = true;
+  axisXLine.geometry.computeBoundingSphere();
+
+  // axisYLine.geometry.attributes.position.needsUpdate = true;
+  // axisYLine.geometry.computeBoundingSphere();
+
+  axisZLine.geometry.attributes.position.needsUpdate = true;
+  axisZLine.geometry.computeBoundingSphere();
+
+  if (axisLegendLabel.length === 0) {
+    const zeroVector = new Vector3(newOriginX, newOriginY, newOriginZ);
+    const xUnitVector = new Vector3(newUnitVectorX, newOriginY, newOriginZ);
+    const yUnitVector = new Vector3(newOriginX, newUnitVectorY, newOriginZ);
+    const zUnitVector = new Vector3(newOriginX, newOriginY, newUnitVectorZ);
+
+    let xText = document.createElement("div");
+    let yText = document.createElement("div");
+    let zText = document.createElement("div");
+    xText.className = "label";
+    xText.style.color = "red";
+    xText.textContent = "X axis";
+    document.querySelector("#container").appendChild(xText);
+
+    axisLegendLabel.push({
+      div: xText,
+      point: getCenterPoint([zeroVector, xUnitVector]),
+    });
+
+    // yText.className = "label";
+    // yText.style.color = "green";
+    // yText.textContent = "Y axis";
+    // document.querySelector("#container").appendChild(yText);
+
+    // axisLegendLabel.push({
+    //   div: yText,
+    //   point: getCenterPoint([zeroVector, yUnitVector]),
+    // });
+
+    zText.className = "label";
+    zText.style.color = "blue";
+    zText.textContent = "Z axis";
+
+    document.querySelector("#container").appendChild(zText);
+
+    axisLegendLabel.push({
+      div: zText,
+      point: getCenterPoint([zeroVector, zUnitVector]),
+    });
+  }
+
+  // axisLegendLabel = newLabel;
+}
+
 function drawAxis() {
   const zeroVector = new Vector3(0, 0, 0);
-  const xUnitVector = new Vector3(5, 0, 0);
-  const yUnitVector = new Vector3(0, 5, 0);
-  const zUnitVector = new Vector3(0, 0, 5);
-  let xText = document.createElement("div");
-  let yText = document.createElement("div");
-  let zText = document.createElement("div");
-  xText.className = "label";
-  xText.style.color = "red";
-  xText.textContent = "X axis";
-  document.querySelector("#container").appendChild(xText);
-
-  labels.push({
-    div: xText,
-    point: getCenterPoint([zeroVector, xUnitVector]),
-  });
-
-  yText.className = "label";
-  yText.style.color = "green";
-  yText.textContent = "Y axis";
-  document.querySelector("#container").appendChild(yText);
-
-  labels.push({
-    div: yText,
-    point: getCenterPoint([zeroVector, yUnitVector]),
-  });
-
-  zText.className = "label";
-  zText.style.color = "blue";
-  zText.textContent = "Z axis";
-
-  document.querySelector("#container").appendChild(zText);
-
-  labels.push({
-    div: zText,
-    point: getCenterPoint([zeroVector, zUnitVector]),
-  });
+  const xUnitVector = new Vector3(1, 0, 0);
+  const yUnitVector = new Vector3(0, 1, 0);
+  const zUnitVector = new Vector3(0, 0, 1);
 
   axisXLine = initAxisLine(xUnitVector, "x");
   axisYLine = initAxisLine(yUnitVector, "y");
@@ -164,7 +238,7 @@ function initLabelContainer() {
 }
 
 function initCamera() {
-  camera = new THREE.PerspectiveCamera(70, width / height, 0.01, 20);
+  camera = new THREE.PerspectiveCamera(75, width / height, 0.01, 20);
 }
 
 function initLight() {
@@ -242,8 +316,6 @@ function initXR() {
 
   window.addEventListener("resize", onWindowResize, false);
   animate();
-
-  drawAxis();
 }
 
 function onSelect() {
@@ -328,10 +400,16 @@ function render(timestamp, frame) {
     }
 
     if (hitTestSource) {
+      if (!isAxis) {
+        drawAxis();
+        isAxis = true;
+      }
+
       let hitTestResults = frame.getHitTestResults(hitTestSource);
       if (hitTestResults.length) {
         let hit = hitTestResults[0];
         reticle.visible = true;
+        // const floorVector3 = matrixToVector(hit.getPose(referenceSpace).transform.matrix);
         reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
       } else {
         reticle.visible = false;
@@ -340,8 +418,25 @@ function render(timestamp, frame) {
       if (currentLine) {
         updateLine(reticle.matrix);
       }
-      if (axisXLine) {
-        // updateAxisXLine(reticle.matrix);
+      if (
+        reticle.visible &&
+        axisXLine &&
+        // axisYLine &&
+        axisZLine &&
+        measurements.length % 3 === 0
+      ) {
+        updateAxisLine(reticle.matrix);
+      } else {
+        axisLegendLabel.map((label) => {
+          let pos = toScreenPosition(
+            label.point,
+            renderer.xr.getCamera(camera)
+          );
+          let x = pos.x;
+          let y = pos.y;
+          label.div.style.transform =
+            "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
+        });
       }
     }
 
