@@ -30,6 +30,7 @@ let distances = [];
 let width, height;
 
 let model3D;
+let models = [];
 
 let curReticlePoint = null;
 
@@ -280,7 +281,7 @@ function init3DLoader() {
     "src/models/woodTile/woodTile.gltf",
     function (gltf) {
       model3D = gltf.scene;
-      model3D.position.set(0.0001, 0, 0);
+      model3D.position.set(0, 0, 0);
       model3D.scale.set(0.01, 0.01, 0.01);
       // scene.add(gltf.scene);
       // scene.add(model3D);
@@ -357,7 +358,16 @@ function onSelect() {
       // measurements = [];
       // currentLine = null;
     } else if (measurements.length == 3) {
-      scene.add(model3D);
+      // scene.add(model3D);
+      stampModel({
+        position: { px: 0, py: 0, pz: 0 },
+        scale: { sx: 0.01, sy: 0.01, sz: 0.01 },
+      });
+
+      stampModel({
+        position: { px: 0.1, py: 0, pz: 0 },
+        scale: { sx: 0.01, sy: 0.01, sz: 0.01 },
+      });
       let distance = Math.round(getDistance(measurements) * 100);
       distances.push(distance);
 
@@ -459,6 +469,20 @@ function render(timestamp, frame) {
     });
   }
   renderer.render(scene, camera);
+}
+
+function stampModel({ position, scale }) {
+  if (model3D && scene) {
+    const { px, py, pz } = position;
+    const { sx, sy, sz } = scale;
+
+    const cpiedModel = model3D.clone();
+    cpiedModel.position.set(px, py, pz);
+    cpiedModel.scale.set(sx, sy, sz);
+
+    models.push(cpiedModel);
+    scene.add(cpiedModel);
+  }
 }
 
 export { initXR };
