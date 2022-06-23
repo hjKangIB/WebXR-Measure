@@ -31,6 +31,8 @@ let width, height;
 
 let model3D;
 
+let curReticlePoint = null;
+
 function toScreenPosition(point, camera) {
   var vector = new THREE.Vector3();
 
@@ -81,6 +83,48 @@ function initAxisLine(point, type) {
   return new THREE.Line(lineGeometry, lineMaterial);
 }
 
+function initAxisLabel() {
+  const { x, y, z, ux, uy, uz } = curReticlePoint;
+  const zeroVector = new Vector3(x, y, z);
+  const xUnitVector = new Vector3(ux, y, z);
+  const yUnitVector = new Vector3(x, uy, z);
+  const zUnitVector = new Vector3(x, y, uz);
+
+  let xText = document.createElement("div");
+  let yText = document.createElement("div");
+  let zText = document.createElement("div");
+  xText.className = "label";
+  xText.style.color = "red";
+  xText.textContent = "X axis";
+  document.querySelector("#container").appendChild(xText);
+
+  axisLegendLabel.push({
+    div: xText,
+    point: getCenterPoint([zeroVector, xUnitVector]),
+  });
+
+  // yText.className = "label";
+  // yText.style.color = "green";
+  // yText.textContent = "Y axis";
+  // document.querySelector("#container").appendChild(yText);
+
+  // axisLegendLabel.push({
+  //   div: yText,
+  //   point: getCenterPoint([zeroVector, yUnitVector]),
+  // });
+
+  zText.className = "label";
+  zText.style.color = "blue";
+  zText.textContent = "Z axis";
+
+  document.querySelector("#container").appendChild(zText);
+
+  axisLegendLabel.push({
+    div: zText,
+    point: getCenterPoint([zeroVector, zUnitVector]),
+  });
+}
+
 function updateLine(matrix) {
   let positions = currentLine.geometry.attributes.position.array;
   positions[3] = matrix.elements[12]; // x?
@@ -104,108 +148,79 @@ function updateAxisLine(matrix) {
   // let yAxisPositions = axisYLine.geometry.attributes.position.array;
   let zAxisPositions = axisZLine.geometry.attributes.position.array;
 
-  const newOriginX = matrix.elements[12];
-  const newOriginY = matrix.elements[13];
-  const newOriginZ = matrix.elements[14];
+  curReticlePoint = {
+    x: matrix.elements[12],
+    y: matrix.elements[13],
+    z: matrix.elements[14],
+    ux: matrix.elements[12] + 1,
+    uy: matrix.elements[13],
+    uz: matrix.elements[14] + 1,
+  };
 
-  const newUnitVectorX = newOriginX + 1;
-  const newUnitVectorY = newOriginY; //y축은 표시될 필요가 없기때문에 그대로 둔다.
-  const newUnitVectorZ = newOriginZ + 1;
+  const { x, y, z } = curReticlePoint;
 
   //선분의 두 점중 첫번째 점의 x좌표
-  xAxisPositions[0] = newOriginX;
-  // yAxisPositions[0] = newOriginX;
-  zAxisPositions[0] = newOriginX;
+  xAxisPositions[0] = x;
+  // yAxisPositions[0] = x;
+  zAxisPositions[0] = x;
 
   //선분의 두 점중 첫번째 점의 y좌표
-  xAxisPositions[1] = newOriginY;
-  // yAxisPositions[1] = newOriginY;
-  zAxisPositions[1] = newOriginY;
+  xAxisPositions[1] = y;
+  // yAxisPositions[1] = y;
+  zAxisPositions[1] = y;
 
   //선분의 두 점중 첫번째 점의 z좌표
-  xAxisPositions[2] = newOriginZ;
-  // yAxisPositions[2] = newOriginZ;
-  zAxisPositions[2] = newOriginZ;
+  xAxisPositions[2] = z;
+  // yAxisPositions[2] = z;
+  zAxisPositions[2] = z;
 
   //선분의 두 점중 두번째 점의 x좌표
-  xAxisPositions[3] = newUnitVectorX;
-  // yAxisPositions[3] = newOriginX;
-  zAxisPositions[3] = newOriginX;
+  xAxisPositions[3] = curReticlePoint.ux;
+  // yAxisPositions[3] = x;
+  zAxisPositions[3] = x;
 
   //선분의 두 점중 두번째 점의 y좌표
-  xAxisPositions[4] = newOriginY;
-  // yAxisPositions[4] = newOriginY;
-  zAxisPositions[4] = newOriginY;
+  xAxisPositions[4] = y;
+  // yAxisPositions[4] = y;
+  zAxisPositions[4] = y;
 
   //선분의 두 점중 두번째 점의 z좌표
-  xAxisPositions[5] = newOriginZ;
-  // yAxisPositions[5] = newOriginZ;
-  zAxisPositions[5] = newUnitVectorZ;
+  xAxisPositions[5] = z;
+  // yAxisPositions[5] = z;
+  zAxisPositions[5] = curReticlePoint.uz;
 
   axisXLine.geometry.attributes.position.needsUpdate = true;
   axisXLine.geometry.computeBoundingSphere();
 
+  // y는 계속해서 바닥에 붙어있으므로 변화가 없다.
   // axisYLine.geometry.attributes.position.needsUpdate = true;
   // axisYLine.geometry.computeBoundingSphere();
 
   axisZLine.geometry.attributes.position.needsUpdate = true;
   axisZLine.geometry.computeBoundingSphere();
+}
 
-  if (axisLegendLabel.length === 0) {
-    const zeroVector = new Vector3(newOriginX, newOriginY, newOriginZ);
-    const xUnitVector = new Vector3(newUnitVectorX, newOriginY, newOriginZ);
-    const yUnitVector = new Vector3(newOriginX, newUnitVectorY, newOriginZ);
-    const zUnitVector = new Vector3(newOriginX, newOriginY, newUnitVectorZ);
-
-    let xText = document.createElement("div");
-    let yText = document.createElement("div");
-    let zText = document.createElement("div");
-    xText.className = "label";
-    xText.style.color = "red";
-    xText.textContent = "X axis";
-    document.querySelector("#container").appendChild(xText);
-
-    axisLegendLabel.push({
-      div: xText,
-      point: getCenterPoint([zeroVector, xUnitVector]),
-    });
-
-    // yText.className = "label";
-    // yText.style.color = "green";
-    // yText.textContent = "Y axis";
-    // document.querySelector("#container").appendChild(yText);
-
-    // axisLegendLabel.push({
-    //   div: yText,
-    //   point: getCenterPoint([zeroVector, yUnitVector]),
-    // });
-
-    zText.className = "label";
-    zText.style.color = "blue";
-    zText.textContent = "Z axis";
-
-    document.querySelector("#container").appendChild(zText);
-
-    axisLegendLabel.push({
-      div: zText,
-      point: getCenterPoint([zeroVector, zUnitVector]),
-    });
-  }
-
-  // axisLegendLabel = newLabel;
+function transAxisLabel() {
+  axisLegendLabel.map((label) => {
+    let pos = toScreenPosition(label.point, renderer.xr.getCamera(camera));
+    let x = pos.x;
+    let y = pos.y;
+    label.div.style.transform =
+      "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
+  });
 }
 
 function drawAxis() {
   const zeroVector = new Vector3(0, 0, 0);
   const xUnitVector = new Vector3(1, 0, 0);
-  const yUnitVector = new Vector3(0, 1, 0);
+  // const yUnitVector = new Vector3(0, 1, 0);
   const zUnitVector = new Vector3(0, 0, 1);
 
   axisXLine = initAxisLine(xUnitVector, "x");
-  axisYLine = initAxisLine(yUnitVector, "y");
+  // axisYLine = initAxisLine(yUnitVector, "y");
   axisZLine = initAxisLine(zUnitVector, "z");
   scene.add(axisXLine);
-  scene.add(axisYLine);
+  // scene.add(axisYLine);
   scene.add(axisZLine);
 }
 
@@ -400,7 +415,7 @@ function render(timestamp, frame) {
     }
 
     if (hitTestSource) {
-      if (!isAxis) {
+      if (!isAxis && reticle.visible) {
         drawAxis();
         isAxis = true;
       }
@@ -426,17 +441,12 @@ function render(timestamp, frame) {
         measurements.length % 3 === 0
       ) {
         updateAxisLine(reticle.matrix);
+
+        if (axisLegendLabel.length === 0) {
+          initAxisLabel();
+        }
       } else {
-        axisLegendLabel.map((label) => {
-          let pos = toScreenPosition(
-            label.point,
-            renderer.xr.getCamera(camera)
-          );
-          let x = pos.x;
-          let y = pos.y;
-          label.div.style.transform =
-            "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
-        });
+        transAxisLabel();
       }
     }
 
