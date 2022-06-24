@@ -33,6 +33,7 @@ let model3D;
 let models = [];
 
 let curReticlePoint = null;
+let curReticleVector;
 
 function toScreenPosition(point, camera) {
   var vector = new THREE.Vector3();
@@ -77,9 +78,17 @@ function initAxisLine(point, type) {
     linecap: "round",
   });
 
+  const origin = matrixToVector(reticle.matrix);
+  const uVector =
+    type === "x"
+      ? new Vector3(origin.x + 1, origin.y, origin.z)
+      : type === "y"
+      ? origin
+      : new Vector3(origin.x, origin.y, origin.z + 1);
   let lineGeometry = new THREE.BufferGeometry().setFromPoints([
-    new Vector3(0, 0, 0),
-    point,
+    // new Vector3(0, 0, 0),
+    origin,
+    uVector,
   ]);
   return new THREE.Line(lineGeometry, lineMaterial);
 }
@@ -133,82 +142,6 @@ function updateLine(matrix) {
   positions[5] = matrix.elements[14]; // z ?
   currentLine.geometry.attributes.position.needsUpdate = true;
   currentLine.geometry.computeBoundingSphere();
-}
-
-/**
- * matrix.elements 의 [12] [13] [14] 가 hitTest 결과 바닥으로 인식된 지점의 3차원 (x,y,z) 좌표로 보인다.
- * 이로인해 테스트중 보조도구로 생성했던 x축, y축, z축 선분을 인식된 바닥을 기준으로 y축 이동을 해주는 함수이다.
- * reticle 표시지점을 새 원점 (0,0,0) 으로 삼고
- *  x축 선분은 (0,0,0), (1,0,0)
- *  y축 선분은 (0,0,0), (0,1,0)
- *  z축 선분은 (0,0,0), (0,0,1)
- * 로 표시해준다.
- * */
-function updateAxisLine(matrix) {
-  let xAxisPositions = axisXLine.geometry.attributes.position.array;
-  // let yAxisPositions = axisYLine.geometry.attributes.position.array;
-  let zAxisPositions = axisZLine.geometry.attributes.position.array;
-
-  curReticlePoint = {
-    x: matrix.elements[12],
-    y: matrix.elements[13],
-    z: matrix.elements[14],
-    ux: matrix.elements[12] + 1,
-    uy: matrix.elements[13],
-    uz: matrix.elements[14] + 1,
-  };
-
-  const { x, y, z } = curReticlePoint;
-
-  //선분의 두 점중 첫번째 점의 x좌표
-  xAxisPositions[0] = x;
-  // yAxisPositions[0] = x;
-  zAxisPositions[0] = x;
-
-  //선분의 두 점중 첫번째 점의 y좌표
-  xAxisPositions[1] = y;
-  // yAxisPositions[1] = y;
-  zAxisPositions[1] = y;
-
-  //선분의 두 점중 첫번째 점의 z좌표
-  xAxisPositions[2] = z;
-  // yAxisPositions[2] = z;
-  zAxisPositions[2] = z;
-
-  //선분의 두 점중 두번째 점의 x좌표
-  xAxisPositions[3] = curReticlePoint.ux;
-  // yAxisPositions[3] = x;
-  zAxisPositions[3] = x;
-
-  //선분의 두 점중 두번째 점의 y좌표
-  xAxisPositions[4] = y;
-  // yAxisPositions[4] = y;
-  zAxisPositions[4] = y;
-
-  //선분의 두 점중 두번째 점의 z좌표
-  xAxisPositions[5] = z;
-  // yAxisPositions[5] = z;
-  zAxisPositions[5] = curReticlePoint.uz;
-
-  axisXLine.geometry.attributes.position.needsUpdate = true;
-  axisXLine.geometry.computeBoundingSphere();
-
-  // y는 계속해서 바닥에 붙어있으므로 변화가 없다.
-  // axisYLine.geometry.attributes.position.needsUpdate = true;
-  // axisYLine.geometry.computeBoundingSphere();
-
-  axisZLine.geometry.attributes.position.needsUpdate = true;
-  axisZLine.geometry.computeBoundingSphere();
-}
-
-function transAxisLabel() {
-  axisLegendLabel.map((label) => {
-    let pos = toScreenPosition(label.point, renderer.xr.getCamera(camera));
-    let x = pos.x;
-    let y = pos.y;
-    label.div.style.transform =
-      "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
-  });
 }
 
 function drawAxis() {
@@ -282,7 +215,7 @@ function init3DLoader() {
     function (gltf) {
       model3D = gltf.scene;
       model3D.position.set(0, 0, 0);
-      model3D.scale.set(0.01, 0.01, 0.01);
+      model3D.scale.set(1, 1, 1);
       // scene.add(gltf.scene);
       // scene.add(model3D);
     },
@@ -358,37 +291,83 @@ function onSelect() {
       // measurements = [];
       // currentLine = null;
     } else if (measurements.length == 3) {
-      // scene.add(model3D);
-      stampModel({
-        position: { px: 0, py: 0, pz: 0 },
-        scale: { sx: 0.01, sy: 0.01, sz: 0.01 },
-      });
+      if (reticle.visible) {
+        let distance = Math.round(getDistance(measurements) * 100);
+        distances.push(distance);
 
-      stampModel({
-        position: { px: 0.1, py: 0, pz: 0 },
-        scale: { sx: 0.01, sy: 0.01, sz: 0.01 },
-      });
-      let distance = Math.round(getDistance(measurements) * 100);
-      distances.push(distance);
+        let text = document.createElement("div");
+        text.className = "label";
+        text.style.color = "rgb(255,255,255)";
+        text.textContent = distance + " cm";
 
-      let text = document.createElement("div");
-      text.className = "label";
-      // text.style.color = "rgb(37,219,0)";
-      text.style.color = "rgb(255,255,255)";
-      text.textContent = distance + " cm";
+        document.querySelector("#container").appendChild(text);
 
-      document.querySelector("#container").appendChild(text);
+        labels.push({
+          div: text,
+          point: getCenterPoint([measurements[1], measurements[2]]),
+        });
 
-      labels.push({
-        div: text,
-        point: getCenterPoint([measurements[1], measurements[2]]),
-      });
+        // add tiles
+        const width = 0.1; // 단위 미터(m)
+        const height = 0.2;
+        const widthMargin = width * 0.005;
+        const heightMargin = height * 0.005;
 
-      measurements = [];
-      currentLine = null;
+        console.log(`distances: ${distances}`);
+
+        const rowCnt = distances[0] / (width * 100);
+        const colCnt = distances[1] / (height * 100);
+
+        for (let i = 0; i < rowCnt - 1; i += 1) {
+          for (let j = 0; j < colCnt - 1; j += 1) {
+            console.log(`rowCnt: ${rowCnt}, colCnt: ${colCnt}`);
+            console.log("measurements", measurements);
+            stampModel({
+              position: {
+                px: measurements[0].x + (width + widthMargin) * i,
+                py: measurements[0].y,
+                pz: measurements[0].z + (height + heightMargin) * j,
+              },
+              scale: { sx: 1, sy: 1, sz: 1 },
+            });
+          }
+        }
+
+        // stampModel({
+        //   position: {
+        //     px: measurements[0].x,
+        //     py: measurements[0].y,
+        //     pz: measurements[0].z,
+        //   },
+        //   scale: { sx: 1, sy: 1, sz: 1 },
+        // });
+        // stampModel({
+        //   position: {
+        //     px: measurements[0].x + 0.1005,
+        //     py: measurements[0].y,
+        //     pz: measurements[0].z,
+        //   },
+        //   scale: { sx: 1, sy: 1, sz: 1 },
+        // });
+
+        // stampModel({
+        //   position: {
+        //     px: measurements[0].x + 0.201,
+        //     py: measurements[0].y,
+        //     pz: measurements[0].z,
+        //   },
+        //   scale: { sx: 1, sy: 1, sz: 1 },
+        // });
+
+        measurements = [];
+        currentLine = null;
+      }
     } else {
       currentLine = initLine(measurements[0]);
       scene.add(currentLine);
+      if (reticle.visible) {
+        drawAxis();
+      }
     }
   }
 }
@@ -425,16 +404,10 @@ function render(timestamp, frame) {
     }
 
     if (hitTestSource) {
-      if (!isAxis && reticle.visible) {
-        drawAxis();
-        isAxis = true;
-      }
-
       let hitTestResults = frame.getHitTestResults(hitTestSource);
       if (hitTestResults.length) {
         let hit = hitTestResults[0];
         reticle.visible = true;
-        // const floorVector3 = matrixToVector(hit.getPose(referenceSpace).transform.matrix);
         reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
       } else {
         reticle.visible = false;
@@ -442,21 +415,6 @@ function render(timestamp, frame) {
 
       if (currentLine) {
         updateLine(reticle.matrix);
-      }
-      if (
-        reticle.visible &&
-        axisXLine &&
-        // axisYLine &&
-        axisZLine &&
-        measurements.length % 3 === 0
-      ) {
-        updateAxisLine(reticle.matrix);
-
-        if (axisLegendLabel.length === 0) {
-          initAxisLabel();
-        }
-      } else {
-        transAxisLabel();
       }
     }
 
@@ -472,6 +430,7 @@ function render(timestamp, frame) {
 }
 
 function stampModel({ position, scale }) {
+  console.log(`position:`, position);
   if (model3D && scene) {
     const { px, py, pz } = position;
     const { sx, sy, sz } = scale;
