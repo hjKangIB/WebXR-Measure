@@ -31,6 +31,7 @@ let width, height;
 
 let model3D;
 let models = [];
+let pivot;
 
 let curReticlePoint = null;
 let curReticleVector;
@@ -264,6 +265,8 @@ function initXR() {
   scene.add(reticle);
 
   window.addEventListener("resize", onWindowResize, false);
+  const axesHelper = new THREE.AxesHelper(5);
+  scene.add(axesHelper);
   animate();
 }
 
@@ -313,51 +316,37 @@ function onSelect() {
         const widthMargin = width * 0.005;
         const heightMargin = height * 0.005;
 
-        console.log(`distances: ${distances}`);
-
         const rowCnt = distances[0] / (width * 100);
         const colCnt = distances[1] / (height * 100);
 
+        pivot.position.set(
+          measurements[0].x,
+          measurements[0].y,
+          measurements[0].z
+        );
+
+        const v1 = new Vector3(
+          measurements[1].x - measurements[0].x,
+          measurements[1].y - measurements[0].y,
+          measurements[1].z - measurements[0].z
+        );
+        const v2 = new Vector3(measurements[1].x - measurements[0].x, 0, 0);
+
+        pivot.rotateY(v1.angleTo(v2));
+        scene.add(pivot);
+
         for (let i = 0; i < rowCnt - 1; i += 1) {
           for (let j = 0; j < colCnt - 1; j += 1) {
-            console.log(`rowCnt: ${rowCnt}, colCnt: ${colCnt}`);
-            console.log("measurements", measurements);
             stampModel({
               position: {
-                px: measurements[0].x + (width + widthMargin) * i,
-                py: measurements[0].y,
-                pz: measurements[0].z + (height + heightMargin) * j,
+                px: (width + widthMargin) * i,
+                py: 0,
+                pz: (height + heightMargin) * j,
               },
               scale: { sx: 1, sy: 1, sz: 1 },
             });
           }
         }
-
-        // stampModel({
-        //   position: {
-        //     px: measurements[0].x,
-        //     py: measurements[0].y,
-        //     pz: measurements[0].z,
-        //   },
-        //   scale: { sx: 1, sy: 1, sz: 1 },
-        // });
-        // stampModel({
-        //   position: {
-        //     px: measurements[0].x + 0.1005,
-        //     py: measurements[0].y,
-        //     pz: measurements[0].z,
-        //   },
-        //   scale: { sx: 1, sy: 1, sz: 1 },
-        // });
-
-        // stampModel({
-        //   position: {
-        //     px: measurements[0].x + 0.201,
-        //     py: measurements[0].y,
-        //     pz: measurements[0].z,
-        //   },
-        //   scale: { sx: 1, sy: 1, sz: 1 },
-        // });
 
         measurements = [];
         currentLine = null;
@@ -425,22 +414,29 @@ function render(timestamp, frame) {
       label.div.style.transform =
         "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
     });
+
+    if (!pivot) {
+      pivot = new THREE.Group();
+    }
   }
   renderer.render(scene, camera);
 }
 
 function stampModel({ position, scale }) {
-  console.log(`position:`, position);
   if (model3D && scene) {
     const { px, py, pz } = position;
     const { sx, sy, sz } = scale;
 
     const cpiedModel = model3D.clone();
-    cpiedModel.position.set(px, py, pz);
+    cpiedModel.position.set(
+      pivot.matrixWorld.elements[12] + px,
+      pivot.matrixWorld.elements[13] + py,
+      pivot.matrixWorld.elements[14] + pz
+    );
     cpiedModel.scale.set(sx, sy, sz);
 
     models.push(cpiedModel);
-    scene.add(cpiedModel);
+    pivot.add(cpiedModel);
   }
 }
 
