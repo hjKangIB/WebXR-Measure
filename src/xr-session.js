@@ -34,7 +34,6 @@ let models = [];
 let pivot;
 
 let curReticlePoint = null;
-let curReticleVector;
 
 function toScreenPosition(point, camera) {
   var vector = new THREE.Vector3();
@@ -147,13 +146,13 @@ function updateLine(matrix) {
 
 function drawAxis() {
   const zeroVector = new Vector3(0, 0, 0);
-  const xUnitVector = new Vector3(1, 0, 0);
+  const ux = new Vector3(1, 0, 0);
   // const yUnitVector = new Vector3(0, 1, 0);
-  const zUnitVector = new Vector3(0, 0, 1);
+  const uz = new Vector3(0, 0, 1);
 
-  axisXLine = initAxisLine(xUnitVector, "x");
+  axisXLine = initAxisLine(ux, "x");
   // axisYLine = initAxisLine(yUnitVector, "y");
-  axisZLine = initAxisLine(zUnitVector, "z");
+  axisZLine = initAxisLine(uz, "z");
   scene.add(axisXLine);
   // scene.add(axisYLine);
   scene.add(axisZLine);
@@ -291,8 +290,6 @@ function onSelect() {
 
       currentLine = initLine(measurements[1]);
       scene.add(currentLine);
-      // measurements = [];
-      // currentLine = null;
     } else if (measurements.length == 3) {
       if (reticle.visible) {
         let distance = Math.round(getDistance(measurements) * 100);
@@ -310,43 +307,7 @@ function onSelect() {
           point: getCenterPoint([measurements[1], measurements[2]]),
         });
 
-        // add tiles
-        const width = 0.1; // 단위 미터(m)
-        const height = 0.2;
-        const widthMargin = width * 0.005;
-        const heightMargin = height * 0.005;
-
-        const rowCnt = distances[0] / (width * 100);
-        const colCnt = distances[1] / (height * 100);
-
-        pivot.position.set(
-          measurements[0].x,
-          measurements[0].y,
-          measurements[0].z
-        );
-
-        const v1 = new Vector3(
-          measurements[1].x - measurements[0].x,
-          measurements[1].y - measurements[0].y,
-          measurements[1].z - measurements[0].z
-        );
-        const v2 = new Vector3(measurements[1].x - measurements[0].x, 0, 0);
-
-        pivot.rotateY(v1.angleTo(v2));
-        scene.add(pivot);
-
-        for (let i = 0; i < rowCnt - 1; i += 1) {
-          for (let j = 0; j < colCnt - 1; j += 1) {
-            stampModel({
-              position: {
-                px: (width + widthMargin) * i,
-                py: 0,
-                pz: (height + heightMargin) * j,
-              },
-              scale: { sx: 1, sy: 1, sz: 1 },
-            });
-          }
-        }
+        placeTile();
 
         measurements = [];
         currentLine = null;
@@ -437,6 +398,120 @@ function stampModel({ position, scale }) {
 
     models.push(cpiedModel);
     pivot.add(cpiedModel);
+  }
+}
+
+function placeTile() {
+  if (scene && pivot && distances.length >= 2 && measurements.length >= 3) {
+    // add tiles
+    const width = 0.1; // 단위 미터(m)
+    const height = 0.2;
+    const widthMargin = width * 0.005;
+    const heightMargin = height * 0.005;
+
+    const rowCnt = distances[0] / (width * 100);
+    const colCnt = distances[1] / (height * 100);
+
+    for (let i = 0; i < rowCnt - 1; i += 1) {
+      for (let j = 0; j < colCnt - 1; j += 1) {
+        stampModel({
+          position: {
+            px: (width + widthMargin) * i,
+            py: 0,
+            pz: (height + heightMargin) * j,
+          },
+          scale: { sx: 1, sy: 1, sz: 1 },
+        });
+      }
+    }
+
+    pivot.position.set(measurements[0].x, measurements[0].y, measurements[0].z);
+
+    let v1, v2;
+
+    v1 = new Vector3(
+      measurements[1].x - measurements[0].x,
+      measurements[1].y - measurements[0].y,
+      measurements[1].z - measurements[0].z
+    );
+    v2 = new Vector3(1, 0, 0);
+    if (
+      measurements[0].x - measurements[1].x <= 0 &&
+      measurements[0].z - measurements[1].z <= 0
+    ) {
+      //1사분면
+
+      if (
+        measurements[2].z - measurements[1].z <=
+        ((measurements[1].z - measurements[0].z) /
+          (measurements[1].x - measurements[0].x)) *
+          (measurements[2].x - measurements[1].x)
+      ) {
+        pivot.rotateX(Math.PI);
+        pivot.rotateY(v1.angleTo(v2));
+      } else {
+        pivot.rotateY(-v1.angleTo(v2));
+      }
+    } else if (
+      measurements[0].x - measurements[1].x >= 0 &&
+      measurements[0].z - measurements[1].z <= 0
+    ) {
+      //2사분면
+      // if (
+      //   measurements[2].x - measurements[1].x <= 0 &&
+      //   measurements[2].z - measurements[1].z <= 0
+      // ) {
+      //   pivot.rotateX(Math.PI);
+      //   pivot.rotateY(v1.angleTo(v2));
+      // } else {
+      //   pivot.rotateY(-v1.angleTo(v2));
+      // }
+      if (
+        measurements[2].z - measurements[1].z >=
+        ((measurements[1].z - measurements[0].z) /
+          (measurements[1].x - measurements[0].x)) *
+          (measurements[2].x - measurements[1].x)
+      ) {
+        pivot.rotateX(Math.PI);
+        pivot.rotateY(v1.angleTo(v2));
+      } else {
+        pivot.rotateY(-v1.angleTo(v2));
+      }
+    } else if (
+      measurements[0].x - measurements[1].x >= 0 &&
+      measurements[0].z - measurements[1].z >= 0
+    ) {
+      //3사분면
+      if (
+        measurements[2].z - measurements[1].z >=
+        ((measurements[1].z - measurements[0].z) /
+          (measurements[1].x - measurements[0].x)) *
+          (measurements[2].x - measurements[1].x)
+      ) {
+        pivot.rotateX(Math.PI);
+        pivot.rotateY(-v1.angleTo(v2));
+      } else {
+        pivot.rotateY(v1.angleTo(v2));
+      }
+    } else if (
+      measurements[0].x - measurements[1].x <= 0 &&
+      measurements[0].z - measurements[1].z >= 0
+    ) {
+      //4사분면
+      if (
+        measurements[2].z - measurements[1].z <=
+        ((measurements[1].z - measurements[0].z) /
+          (measurements[1].x - measurements[0].x)) *
+          (measurements[2].x - measurements[1].x)
+      ) {
+        pivot.rotateX(Math.PI);
+        pivot.rotateY(-v1.angleTo(v2));
+      } else {
+        pivot.rotateY(v1.angleTo(v2));
+      }
+    }
+
+    scene.add(pivot);
   }
 }
 
