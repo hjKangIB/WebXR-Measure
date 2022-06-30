@@ -264,8 +264,8 @@ function initXR() {
   scene.add(reticle);
 
   window.addEventListener("resize", onWindowResize, false);
-  const axesHelper = new THREE.AxesHelper(5);
-  scene.add(axesHelper);
+  // const axesHelper = new THREE.AxesHelper(5);
+  // scene.add(axesHelper);
   animate();
 }
 
