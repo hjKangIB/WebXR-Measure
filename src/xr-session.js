@@ -19,10 +19,11 @@ let labels = [];
 let axisLegendLabel = [];
 
 let reticle;
+let lines = [];
 let currentLine = null;
 
 let axisXLine = null;
-let axisYLine = null;
+// let axisYLine = null;
 let axisZLine = null;
 
 let distances = [];
@@ -67,6 +68,7 @@ function initLine(point) {
   });
 
   let lineGeometry = new THREE.BufferGeometry().setFromPoints([point, point]);
+
   return new THREE.Line(lineGeometry, lineMaterial);
 }
 
@@ -145,17 +147,19 @@ function updateLine(matrix) {
 }
 
 function drawAxis() {
-  const zeroVector = new Vector3(0, 0, 0);
-  const ux = new Vector3(1, 0, 0);
-  // const yUnitVector = new Vector3(0, 1, 0);
-  const uz = new Vector3(0, 0, 1);
+  if (!axisXLine && !axisZLine) {
+    const zeroVector = new Vector3(0, 0, 0);
+    const ux = new Vector3(1, 0, 0);
+    // const yUnitVector = new Vector3(0, 1, 0);
+    const uz = new Vector3(0, 0, 1);
 
-  axisXLine = initAxisLine(ux, "x");
-  // axisYLine = initAxisLine(yUnitVector, "y");
-  axisZLine = initAxisLine(uz, "z");
-  scene.add(axisXLine);
-  // scene.add(axisYLine);
-  scene.add(axisZLine);
+    axisXLine = initAxisLine(ux, "x");
+    // axisYLine = initAxisLine(yUnitVector, "y");
+    axisZLine = initAxisLine(uz, "z");
+    scene.add(axisXLine);
+    // scene.add(axisYLine);
+    scene.add(axisZLine);
+  }
 }
 
 function initReticle() {
@@ -272,6 +276,7 @@ function initXR() {
 function onSelect() {
   if (reticle.visible) {
     measurements.push(matrixToVector(reticle.matrix));
+
     if (measurements.length == 2) {
       let distance = Math.round(getDistance(measurements) * 100);
       distances.push(distance);
@@ -289,36 +294,99 @@ function onSelect() {
       });
 
       currentLine = initLine(measurements[1]);
+      lines.push(currentLine);
       scene.add(currentLine);
     } else if (measurements.length == 3) {
-      if (reticle.visible) {
-        let distance = Math.round(getDistance(measurements) * 100);
-        distances.push(distance);
+      let distance = Math.round(getDistance(measurements) * 100);
+      distances.push(distance);
 
-        let text = document.createElement("div");
-        text.className = "label";
-        text.style.color = "rgb(255,255,255)";
-        text.textContent = distance + " cm";
+      let text = document.createElement("div");
+      text.className = "label";
+      text.style.color = "rgb(255,255,255)";
+      text.textContent = distance + " cm";
 
-        document.querySelector("#container").appendChild(text);
+      document.querySelector("#container").appendChild(text);
 
-        labels.push({
-          div: text,
-          point: getCenterPoint([measurements[1], measurements[2]]),
-        });
+      labels.push({
+        div: text,
+        point: getCenterPoint([measurements[1], measurements[2]]),
+      });
 
-        placeTile();
+      placeTile();
 
-        measurements = [];
-        currentLine = null;
-      }
+      currentLine = null;
+    } else if (measurements.length == 4) {
+      wipeOutScene();
     } else {
       currentLine = initLine(measurements[0]);
+
+      lines.push(currentLine);
       scene.add(currentLine);
-      if (reticle.visible) {
-        drawAxis();
-      }
+      // if (reticle.visible) {
+
+      drawAxis();
+      // }
     }
+  }
+}
+
+function wipeOutScene() {
+  if (!scene) return;
+  if (measurements.length > 0) measurements = [];
+
+  if (lines.length > 0) {
+    lines.map((line) => {
+      // line.geometry.dispose();
+      // line.material.dispose();
+      // scene.remove(line);
+
+      removeObject3D(line);
+    });
+
+    lines = [];
+  }
+
+  if (currentLine) currentLine = null;
+
+  if (axisXLine && axisZLine) {
+    // axisXLine.geometry.dispose();
+    // axisXLine.material.dispose();
+    // scene.remove(axisXLine);
+    removeObject3D(axisXLine);
+    axisXLine = null;
+
+    // axisZLine.geometry.dispose();
+    // axisZLine.material.dispose();
+    // scene.remove(axisZLine);
+    removeObject3D(axisZLine);
+    axisZLine = null;
+  }
+
+  if (models.length > 0) {
+    models.map((model) => {
+      // scene.remove(model)
+      removeObject3D(model);
+    });
+  }
+  models = [];
+
+  if (pivot) {
+    // scene.remove(pivot);
+    removeObject3D(pivot);
+    pivot = null;
+  }
+
+  if (labels.length >= 0) {
+    const results = labels.map((label) => {
+      return new Promise((resolve) => {
+        document.querySelector("#container").removeChild(label.div);
+        resolve();
+      });
+    });
+
+    Promise.all(results).then(() => {
+      labels = [];
+    });
   }
 }
 
@@ -368,13 +436,14 @@ function render(timestamp, frame) {
       }
     }
 
-    labels.map((label) => {
-      let pos = toScreenPosition(label.point, renderer.xr.getCamera(camera));
-      let x = pos.x;
-      let y = pos.y;
-      label.div.style.transform =
-        "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
-    });
+    labels.length > 0 &&
+      labels.map((label) => {
+        let pos = toScreenPosition(label.point, renderer.xr.getCamera(camera));
+        let x = pos.x;
+        let y = pos.y;
+        label.div.style.transform =
+          "translate(-50%, -50%) translate(" + x + "px," + y + "px)";
+      });
 
     if (!pivot) {
       pivot = new THREE.Group();
@@ -457,15 +526,7 @@ function placeTile() {
       measurements[0].z - measurements[1].z <= 0
     ) {
       //2사분면
-      // if (
-      //   measurements[2].x - measurements[1].x <= 0 &&
-      //   measurements[2].z - measurements[1].z <= 0
-      // ) {
-      //   pivot.rotateX(Math.PI);
-      //   pivot.rotateY(v1.angleTo(v2));
-      // } else {
-      //   pivot.rotateY(-v1.angleTo(v2));
-      // }
+
       if (
         measurements[2].z - measurements[1].z >=
         ((measurements[1].z - measurements[0].z) /
@@ -513,6 +574,28 @@ function placeTile() {
 
     scene.add(pivot);
   }
+}
+
+function removeObject3D(object) {
+  if (!(object instanceof THREE.Object3D)) return false;
+  // for better memory management and performance
+  if (object.geometry) {
+    object.geometry.dispose();
+  }
+  if (object.material) {
+    if (object.material instanceof Array) {
+      // for better memory management and performance
+      object.material.forEach((material) => material.dispose());
+    } else {
+      // for better memory management and performance
+      object.material.dispose();
+    }
+  }
+  if (object.parent) {
+    object.parent.remove(object);
+  }
+  // the parent might be the scene or another Object3D, but it is sure to be removed this way
+  return true;
 }
 
 export { initXR };
